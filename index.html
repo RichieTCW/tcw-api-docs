@@ -1,0 +1,273 @@
+<title>TCW Partner API Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#F4F6F9; --surface:#FFFFFF; --ink:#1B2230; --muted:#5C6674; --line:#D6DCE5; --line-strong:#B9C2CF;
+  --accent:#2F4E8F; --accent-soft:#E6ECF7; --ok:#2E7D5B; --ok-soft:#E4F2EB; --warn:#A8690F; --warn-soft:#FBF0DC; --code-bg:#EEF1F5;
+  --display:"Newsreader",Georgia,serif; --body:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#11151B; --surface:#181D25; --ink:#E4E8EF; --muted:#98A2B1; --line:#2A313C; --line-strong:#3B4450;
+  --accent:#8AA6E6; --accent-soft:#1F2A40; --ok:#5FBF93; --ok-soft:#173226; --warn:#E0A64A; --warn-soft:#3A2B10; --code-bg:#0E1218;
+}}
+:root[data-theme="dark"]{
+  --bg:#11151B; --surface:#181D25; --ink:#E4E8EF; --muted:#98A2B1; --line:#2A313C; --line-strong:#3B4450;
+  --accent:#8AA6E6; --accent-soft:#1F2A40; --ok:#5FBF93; --ok-soft:#173226; --warn:#E0A64A; --warn-soft:#3A2B10; --code-bg:#0E1218;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55;padding-block:0 4rem;padding-inline:clamp(16px,4vw,40px)}
+.wrap{max-width:880px;margin:0 auto}
+header.top{padding-block:2.5rem 1.25rem;border-bottom:1px solid var(--line);margin-bottom:1.5rem}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--display);font-weight:500;font-size:clamp(32px,5vw,46px);line-height:1.05;margin:.35rem 0 .6rem;text-wrap:balance}
+.lede{font-size:16.5px;max-width:62ch;margin:0}
+h2{font-family:var(--display);font-weight:500;font-size:26px;margin:2.6rem 0 .6rem;text-wrap:balance}
+h3{font-size:15px;font-weight:600;margin:1.4rem 0 .4rem}
+p{max-width:68ch;margin:.5rem 0}
+code{font-family:var(--mono);font-size:.92em;background:var(--code-bg);padding:.1em .35em;border-radius:3px}
+pre{font-family:var(--mono);font-size:12.5px;line-height:1.5;background:var(--code-bg);border:1px solid var(--line);border-radius:6px;padding:.9rem 1rem;overflow-x:auto;margin:.75rem 0}
+pre code{background:none;padding:0}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:.75rem 0}
+th{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;font-weight:500;padding:.5rem .6rem;border-bottom:1px solid var(--line-strong)}
+td{padding:.55rem .6rem;border-bottom:1px solid var(--line);vertical-align:top}
+.tablewrap{overflow-x:auto}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:.35rem 1.25rem;font-size:14px;margin:.75rem 0;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:.9rem 1rem}
+.kv dt{font-family:var(--mono);font-size:12px;color:var(--muted);padding-top:.15rem}
+.kv dd{margin:0;overflow-wrap:anywhere}
+.note{border-left:3px solid var(--accent);background:var(--surface);padding:.7rem 1rem;margin:1rem 0;max-width:72ch;font-size:14px}
+.note.warn{border-color:var(--warn)}
+.pill{display:inline-block;font-family:var(--mono);font-size:11.5px;padding:.1em .5em;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+ul{max-width:70ch}
+li{margin:.3rem 0}
+@media (max-width:520px){ .kv{grid-template-columns:1fr} }
+</style>
+
+<div class="wrap">
+<header class="top">
+  <div class="eyebrow">Trading Card World · partner API</div>
+  <h1>TCW Partner API Guide</h1>
+  <p class="lede">A GraphQL API over Trading Card World's live catalog: products, variants, prices, images, and stock, plus <b>holds</b> that reserve stock for you and <b>orders</b> we ship to you. This page is everything you need to integrate.</p>
+</header>
+
+<h2>Connect</h2>
+<dl class="kv">
+  <dt>endpoint</dt><dd><code>POST https://tcw-api-8rgfmmib.uc.gateway.dev/graphql</code></dd>
+  <dt>auth</dt><dd>Header <code>x-api-key: &lt;your key&gt;</code> on every request. Your key was issued to you once; TCW does not store it and cannot recover it. If it's lost, ask for a new one.</dd>
+  <dt>body</dt><dd>JSON <code>{"query": "...", "variables": {...}}</code>, standard GraphQL over HTTP. GET with a <code>query</code> parameter also works for simple reads.</dd>
+  <dt>liveness</dt><dd><code>GET https://tcw-api-8rgfmmib.uc.gateway.dev/status</code>, no key needed, returns <code>{"ok":true,"version":"..."}</code></dd>
+  <dt>schema</dt><dd>Introspection is enabled. Point any GraphQL client at the endpoint with your key and it will autocomplete.</dd>
+</dl>
+
+<h3>First call</h3>
+<pre><code>curl -s https://tcw-api-8rgfmmib.uc.gateway.dev/graphql \
+  -H "x-api-key: $TCW_API_KEY" -H "content-type: application/json" \
+  -d '{"query":"{ variant(sku:\"PKMS-3246-N\"){ sku price stock{ band quantity checkedAt } product{ title } } }"}'</code></pre>
+<pre><code>{"data":{"variant":{"sku":"PKMS-3246-N","price":"300.00",
+  "stock":{"band":"IN_STOCK","quantity":4,"checkedAt":"2026-09-10T21:14:02Z"},
+  "product":{"title":"Scarlet &amp; Violet: Base Set - Booster Box"}}}}</code></pre>
+
+<h2>What you can read</h2>
+<p>Three entry points, all on <code>Query</code>.</p>
+<div class="tablewrap"><table>
+<tr><th>field</th><th>arguments</th><th>returns</th></tr>
+<tr><td><code>products</code></td><td><code>first</code> (max 250), <code>after</code> cursor, <code>query</code> Shopify search syntax, <code>updatedSince</code> ISO datetime</td><td>A page of products, newest-updated first, with cursor paging.</td></tr>
+<tr><td><code>product</code></td><td>one of <code>id</code>, <code>handle</code>, <code>sku</code></td><td>One product, or null.</td></tr>
+<tr><td><code>variant</code></td><td><code>sku</code></td><td>One variant with its parent product, or null.</td></tr>
+</table></div>
+
+<h3>Product</h3>
+<p><code>id</code>, <code>handle</code>, <code>title</code>, <code>status</code>, <code>productType</code>, <code>vendor</code>, <code>tags</code>, <code>category</code> (Shopify standard taxonomy node, when set), <code>descriptionHtml</code>, <code>images</code>, <code>variants</code>, <code>url</code>, <code>createdAt</code>, <code>updatedAt</code>.</p>
+<h3>Variant</h3>
+<p><code>id</code>, <code>sku</code>, <code>title</code>, <code>barcode</code>, <code>price</code> (USD, string), <code>compareAtPrice</code>, <code>availableForSale</code>, <code>stock</code>, <code>product</code>.</p>
+<h3>Stock</h3>
+<div class="tablewrap"><table>
+<tr><th>field</th><th>meaning</th></tr>
+<tr><td><code>quantity</code></td><td>Exact on-hand count from the shop's inventory. Your key includes the <code>inventory:read</code> scope, so this is always populated. It can go <b>negative</b> when the shop has oversold an item; treat anything at or below zero as none available.</td></tr>
+<tr><td><code>band</code></td><td>A convenience summary of the same number: <code>IN_STOCK</code> more than 3, <code>LOW</code> 1 to 3, <code>OUT</code> zero or less. Use <code>quantity</code> for anything that matters.</td></tr>
+<tr><td><code>checkedAt</code></td><td>When this figure was read from the shop's inventory system, i.e. the moment of your request.</td></tr>
+</table></div>
+
+<div class="note warn"><b>A stock figure is not a reservation.</b> TCW sells in a physical store and online at the same time, and <code>quantity</code> is what is available right now with every existing hold and unshipped order already taken out. It can be gone a minute later. If you need units kept for you, place a <a href="#holds">hold</a>: that is the only thing that takes stock off the shelf.</div>
+
+<h2>Inventory lookups</h2>
+<p>Every example below was run against the live API. Stock always comes from the variant, because each condition or packaging of an item is its own variant with its own count.</p>
+
+<h3>One SKU</h3>
+<pre><code>{ variant(sku: "PKMS-3246-N") { sku price availableForSale stock { quantity checkedAt } } }</code></pre>
+<pre><code>{"data":{"variant":{"sku":"PKMS-3246-N","price":"300.00","availableForSale":true,
+  "stock":{"quantity":4,"checkedAt":"2026-09-10T15:52:17Z"}}}}</code></pre>
+
+<h3>The same, with a variable</h3>
+<pre><code>{"query": "query Stock($sku: String!) { variant(sku: $sku) { sku stock { quantity } } }",
+ "variables": {"sku": "PKMS-3248-N"}}</code></pre>
+
+<h3>Several SKUs in one request</h3>
+<p>Use aliases, up to 10 per request. Each alias is one Shopify lookup on our side, so this is the efficient way to check a short list.</p>
+<pre><code>{
+  a: variant(sku: "PKMS-3246-N") { sku stock { quantity } }
+  b: variant(sku: "PKMS-3311-N") { sku stock { quantity } }
+  c: variant(sku: "PKMS-3248-N") { sku stock { quantity } }
+}</code></pre>
+<pre><code>{"data":{"a":{"sku":"PKMS-3246-N","stock":{"quantity":4}},
+         "b":{"sku":"PKMS-3311-N","stock":{"quantity":1}},
+         "c":{"sku":"PKMS-3248-N","stock":{"quantity":80}}}}</code></pre>
+
+<h3>Every condition of one card</h3>
+<p>Fetch the product and read all its variants. Singles carry one variant per condition tier.</p>
+<pre><code>{ product(handle: "espeon-deoxys-gx-sm240-sun-moon-black-star-promos") {
+    title
+    variants { sku title price stock { quantity } } } }</code></pre>
+<pre><code>"variants":[{"sku":"SMP-SM240-EN-HF-1","title":"Near Mint Holofoil","stock":{"quantity":0}},
+            {"sku":"SMP-SM240-EN-HF-2","title":"Lightly Played Holofoil","stock":{"quantity":0}},
+            {"sku":"SMP-SM240-EN-HF-3","title":"Moderately Played Holofoil","stock":{"quantity":1}}, ...]</code></pre>
+<p>The same works with <code>product(sku: "SMP-SM240-EN-HF-3")</code>: pass any one variant's SKU and you get the whole product with all of its variants.</p>
+
+<h3>By barcode (UPC)</h3>
+<pre><code>{ products(first: 1, query: "barcode:820650853463") {
+    edges { node { title variants { sku barcode stock { quantity } } } } } }</code></pre>
+
+<h3>A SKU family by prefix</h3>
+<pre><code>{ products(first: 250, query: "sku:PKMS-32*") {
+    pageInfo { hasNextPage endCursor }
+    edges { node { title variants { sku stock { quantity } } } } } }</code></pre>
+
+<h3>Only what is in stock</h3>
+<pre><code>{ products(first: 250, query: "inventory_total:>0 AND product_type:'Pokemon Sealed'") {
+    pageInfo { hasNextPage endCursor }
+    edges { node { title variants { sku price stock { quantity } } } } } }</code></pre>
+<p><code>inventory_total</code> is the sum across a product's variants, so a product with one in-stock condition and four sold-out ones still matches; check each variant's <code>quantity</code>.</p>
+
+<h2>Common patterns</h2>
+
+<h3>Page through the catalog</h3>
+<pre><code>query Page($after: String) {
+  products(first: 250, after: $after) {
+    pageInfo { hasNextPage endCursor }
+    edges { node { id handle title productType tags
+      variants { sku price compareAtPrice availableForSale stock { band quantity } } } }
+  }
+}</code></pre>
+<p>Loop while <code>hasNextPage</code>, passing <code>endCursor</code> as <code>after</code>. The live catalog is a few thousand products, so a full pull is about 14 requests at 250 per page.</p>
+
+<h3>Keep in sync without re-pulling everything</h3>
+<pre><code>{ products(first: 250, updatedSince: "2026-09-11T00:00:00Z") {
+    pageInfo { hasNextPage endCursor }
+    edges { node { id updatedAt variants { sku price stock { band quantity } } } } } }</code></pre>
+<p>Poll with the timestamp of your last successful sync. Products are ordered newest-updated first, so the first page is the most recent changes.</p>
+
+<h3>Filter with Shopify search syntax</h3>
+<pre><code>{ products(first: 50, query: "product_type:'Pokemon Sealed'") { edges { node { title } } } }
+{ products(first: 50, query: "tag:'Prismatic Evolutions'") { edges { node { title } } } }
+{ products(first: 50, query: "title:Charizard*") { edges { node { title } } } }</code></pre>
+<p>The <code>query</code> argument accepts Shopify's product search syntax: <code>product_type:</code>, <code>tag:</code>, <code>vendor:</code>, <code>title:</code>, <code>sku:</code>, with <code>AND</code>, <code>OR</code>, <code>-</code> for not, and <code>*</code> as a trailing wildcard. Field matches are exact terms, so use the wildcard for partial titles. Regardless of what you pass, results are always limited to live, published products.</p>
+
+<h3>Look up one SKU</h3>
+<pre><code>{ variant(sku: "SV05-007-EN-NH-1") { price availableForSale stock { band quantity } product { title handle url } } }</code></pre>
+<p>Single cards carry one SKU per condition. The suffix encodes it: <code>-NH-1</code> is Near Mint Holo, <code>-HF-1</code> is Holofoil, and the trailing number is the condition tier. Each condition is its own variant with its own price and stock.</p>
+
+
+<h2 id="holds">Holds and orders</h2>
+<p>A <b>hold</b> reserves specific units for you for a set number of days. While it stands, those units are unavailable to every other channel, including TCW's own store and website. At the end you either <b>convert</b> it into an order that we ship to you, <b>release</b> it, or let it <b>expire</b>, at which point the units go back on sale. An <b>order</b> is the same thing without the waiting: reserve and convert in one call.</p>
+<p>These need the <code>holds:write</code> and <code>orders:write</code> scopes on your key; <code>orders:read</code> lets you read your own holds and orders back. You only ever see and control your own. Prices are TCW's retail prices at the moment the hold is placed.</p>
+
+<div class="tablewrap"><table>
+<tr><th>mutation</th><th>does</th></tr>
+<tr><td><code>createHold(input)</code></td><td>Reserve units for <code>holdDays</code> (default 3, max 7).</td></tr>
+<tr><td><code>extendHold(id, days)</code></td><td>Push the expiry out. A hold can last 14 days in total.</td></tr>
+<tr><td><code>releaseHold(id)</code></td><td>Give the units back. Safe to repeat.</td></tr>
+<tr><td><code>convertHold(id, input)</code></td><td>Turn the hold into an order shipped to your address.</td></tr>
+<tr><td><code>createOrder(input)</code></td><td>Order directly, no hold. Same rules and limits.</td></tr>
+</table></div>
+<p>Queries: <code>hold(id)</code>, <code>holds(status, first)</code>, <code>order(id)</code>, <code>orders(first)</code>.</p>
+
+<h3>Every write has a dry run</h3>
+<p>Pass <code>dryRun: true</code> and you get the priced lines and any problems, and nothing is written. Do this first; the real call takes the identical input.</p>
+<pre><code>mutation {
+  createHold(input: { lines: [{ sku: "PKMS-1465-N", quantity: 1 }], holdDays: 1,
+                      reference: "PO-1042", idempotencyKey: "PO-1042-hold", dryRun: true }) {
+    hold { status units subtotal expiresAt lines { sku title unitPrice } }
+    problems { code message sku }
+  }
+}</code></pre>
+<pre><code>{"data":{"createHold":{"hold":{"status":"PREVIEW","units":1,"subtotal":"80.00",
+  "expiresAt":"2026-09-19T16:25:45Z",
+  "lines":[{"sku":"PKMS-1465-N","title":"Scarlet &amp; Violet: Destined Rivals - Booster Bundle","unitPrice":"80.00"}]},
+  "problems":[]}}}</code></pre>
+
+<h3>Place the hold</h3>
+<p>Same input without <code>dryRun</code>. Keep the returned <code>id</code>; it is how you refer to the hold from now on.</p>
+<pre><code>{"data":{"createHold":{"hold":{"id":"h_d79c13c62082","status":"HELD","units":1,"subtotal":"80.00",
+  "currency":"USD","expiresAt":"2026-09-19T16:25:45Z","createdAt":"2026-09-18T16:25:45Z"},"problems":[]}}}</code></pre>
+<p>From this moment the variant's <code>stock.quantity</code> is one lower for everyone, including you.</p>
+
+<h3>idempotencyKey: retries are safe</h3>
+<p><code>createHold</code> and <code>createOrder</code> require an <code>idempotencyKey</code>: any string unique to that request on your side, such as your PO number plus a suffix. If a request times out and you send it again with the same key and the same input, you get the existing hold back instead of a second one. The same key with <em>different</em> input is refused with <code>IDEMPOTENCY_MISMATCH</code>.</p>
+
+<h3>Convert it to an order</h3>
+<pre><code>mutation {
+  convertHold(id: "h_d79c13c62082", input: {
+    shippingAddress: { company: "Acme Cards", firstName: "Receiving", lastName: "Dept",
+                       address1: "20 W 34th St", city: "New York", province: "NY", country: "US", zip: "10001" }
+    reference: "PO-1042" }) {
+    order { id name createdAt paymentStatus fulfillmentStatus subtotal shipping tax total lines { sku quantity unitPrice } }
+    hold { status }
+    problems { code message }
+  }
+}</code></pre>
+<pre><code>{"data":{"convertHold":{"order":{"id":"7087128739978","name":"#88664","createdAt":"2026-09-18T16:28:40Z",
+  "paymentStatus":"PAID","fulfillmentStatus":"UNFULFILLED","subtotal":"80.00","shipping":"0.00","tax":"0.00","total":"80.00",
+  "lines":[{"sku":"PKMS-1465-N","quantity":1,"unitPrice":"80.00"}]},"hold":{"status":"CONVERTED"},"problems":[]}}}</code></pre>
+<div class="note"><b>How payment works.</b> Converting records the order in our system and commits the stock to you. TCW invoices you separately for your orders; nothing ships until that invoice is settled. <code>paymentStatus</code> reflects our internal bookkeeping, not whether your invoice is paid. Shipping is added when we invoice, so it reads <code>0.00</code> on the order.</div>
+
+<h3>Watch it ship</h3>
+<pre><code>{ order(id: "7087128739978") { name fulfillmentStatus tracking { number url company } } }</code></pre>
+<p><code>fulfillmentStatus</code> moves from <code>UNFULFILLED</code> to <code>FULFILLED</code> and <code>tracking</code> fills in when we ship. Polling every few minutes is fine.</p>
+
+<h3>Release, list, and let expire</h3>
+<pre><code>mutation { releaseHold(id: "h_d79c13c62082") { hold { status } problems { code message } } }
+{ holds(status: HELD) { id units subtotal expiresAt reference } }
+{ orders(first: 20) { name createdAt total fulfillmentStatus reference } }</code></pre>
+<p>A hold you do nothing with expires at <code>expiresAt</code> and the units return to stock. Its status becomes <code>EXPIRED</code>; place a new hold or order if you still want them.</p>
+
+<h3>Problems</h3>
+<p>Business rules come back in <code>problems</code> with a 200, not as GraphQL errors. The request was understood but not performed; nothing was written.</p>
+<div class="tablewrap"><table>
+<tr><th>code</th><th>meaning</th></tr>
+<tr><td><code>SKU_NOT_FOUND</code> / <code>NOT_AVAILABLE</code></td><td>No live product with that SKU, or it is not for sale.</td></tr>
+<tr><td><code>INSUFFICIENT_STOCK</code></td><td>Fewer units available than requested; the message says how many.</td></tr>
+<tr><td><code>INVALID_QUANTITY</code> / <code>DUPLICATE_SKU</code> / <code>NO_LINES</code></td><td>Malformed lines.</td></tr>
+<tr><td><code>TOO_MANY_UNITS</code> / <code>VALUE_LIMIT</code> / <code>TOO_MANY_HOLDS</code> / <code>INVALID_DAYS</code></td><td>Over a limit, see below.</td></tr>
+<tr><td><code>HOLD_NOT_HELD</code> / <code>HOLD_EXPIRED</code></td><td>The hold is not in a state that allows this; e.g. releasing a converted hold.</td></tr>
+<tr><td><code>IDEMPOTENCY_MISMATCH</code></td><td>That key was already used for a different request.</td></tr>
+</table></div>
+
+<h3>Limits</h3>
+<ul>
+  <li>Per hold or order: at most <b>50 units</b> and <b>5,000 USD</b> at retail.</li>
+  <li>At most <b>10 open holds</b> at a time. Release or convert one to place another.</li>
+  <li>Hold length 1 to <b>7 days</b> per request, <b>14 days</b> total after extensions.</li>
+  <li>Writes are limited to <b>20 per minute</b> per key, separate from the read limit.</li>
+</ul>
+<p>Need more room on any of these? Ask; they are settings on your key, not code.</p>
+
+<h2>Limits and errors</h2>
+<div class="tablewrap"><table>
+<tr><th>status</th><th>meaning</th><th>what to do</th></tr>
+<tr><td>401</td><td>No key sent, or the key isn't recognised</td><td>Check the <code>x-api-key</code> header.</td></tr>
+<tr><td>400 "API key not valid" or "expired"</td><td>Key revoked or expired</td><td>Contact TCW for a new key.</td></tr>
+<tr><td>429</td><td>Over your per-minute rate limit</td><td>Back off for the <code>retry-after</code> seconds, then resume. A few requests per second stays well within it.</td></tr>
+<tr><td>200 with <code>errors</code></td><td>Query problem: unknown field, too deep, too expensive</td><td>Read the message; it names the field or limit.</td></tr>
+</table></div>
+<ul>
+  <li><b>Rate limit</b> is per key: 300 requests per minute unless you were told otherwise. Every request counts, including errors. Paging at a few requests per second is fine.</li>
+  <li><b>Query limits:</b> depth 7, at most 10 aliases, and a cost budget sized so a full <code>first: 250</code> page with every product and variant field fits. Larger pages are refused; page instead.</li>
+  <li><b>No batching</b> of multiple operations in one request.</li>
+  <li><b>Scope errors</b> come back as a GraphQL error with <code>extensions.code: "FORBIDDEN"</code> naming the scope your key lacks.</li>
+</ul>
+
+<h2>Changes and support</h2>
+<p>The schema only grows. New fields and types are added without notice; existing fields are never removed or changed in meaning without contacting you first, and deprecated fields keep working for a transition period. Point your tooling at introspection to pick up additions.</p>
+<p>Questions, a lost key, or a higher rate limit: <b>richie@tradingcardworld.info</b>.</p>
+<p class="eyebrow" style="margin-top:2rem">Guide version 2026-09-18 (rev 3): holds and orders</p>
+</div>
