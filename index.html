@@ -201,8 +201,15 @@ li{margin:.3rem 0}
   "currency":"USD","expiresAt":"2026-09-19T16:25:45Z","createdAt":"2026-09-18T16:25:45Z"},"problems":[]}}}</code></pre>
 <p>From this moment the variant's <code>stock.quantity</code> is one lower for everyone, including you.</p>
 
-<h3>idempotencyKey: retries are safe</h3>
-<p><code>createHold</code> and <code>createOrder</code> require an <code>idempotencyKey</code>: any string unique to that request on your side, such as your PO number plus a suffix. If a request times out and you send it again with the same key and the same input, you get the existing hold back instead of a second one. The same key with <em>different</em> input is refused with <code>IDEMPOTENCY_MISMATCH</code>.</p>
+<h3>idempotencyKey: so a retry can never double an order</h3>
+<p>Networks fail at the worst moment. Your system sends "hold one bundle", we create the hold, and the reply is lost on the way back to you, or your client gives up waiting. From your side the request failed, so it retries. Without protection that retry creates a <em>second</em> hold, and on <code>createOrder</code> a second shipment.</p>
+<p>The <code>idempotencyKey</code> prevents that. It is a label you make up that means "this particular request", and it is required on <code>createHold</code> and <code>createOrder</code>. Use something you already have, such as your purchase order number with a suffix: <code>PO-1042-hold</code>. We remember which key created which hold.</p>
+<ul>
+  <li><b>Same key, same input:</b> we do nothing new and return the hold that key created the first time. Your retry is harmless. Send the identical request as many times as you like.</li>
+  <li><b>Same key, different input</b> (say the quantity changed): we cannot tell a retry from a new request that reused a key, so we refuse with <code>IDEMPOTENCY_MISMATCH</code> and write nothing. Use a fresh key for the new request.</li>
+  <li><b>New key:</b> a new hold.</li>
+</ul>
+<p>Keys are scoped to you, so they only need to be unique within your own system. The rule of thumb: generate the key <em>before</em> you send, store it with the request, and reuse it on every retry of that request. <code>convertHold</code>, <code>extendHold</code> and <code>releaseHold</code> don't need one because they act on a hold that already exists; repeating them is safe by nature.</p>
 
 <h3>Convert it to an order</h3>
 <pre><code>mutation {
@@ -218,7 +225,7 @@ li{margin:.3rem 0}
 <pre><code>{"data":{"convertHold":{"order":{"id":"7087128739978","name":"#88664","createdAt":"2026-09-18T16:28:40Z",
   "paymentStatus":"PAID","fulfillmentStatus":"UNFULFILLED","subtotal":"80.00","shipping":"0.00","tax":"0.00","total":"80.00",
   "lines":[{"sku":"PKMS-1465-N","quantity":1,"unitPrice":"80.00"}]},"hold":{"status":"CONVERTED"},"problems":[]}}}</code></pre>
-<div class="note"><b>How payment works.</b> Converting records the order in our system and commits the stock to you. TCW invoices you separately for your orders; nothing ships until that invoice is settled. <code>paymentStatus</code> reflects our internal bookkeeping, not whether your invoice is paid. Shipping is added when we invoice, so it reads <code>0.00</code> on the order.</div>
+<div class="note"><b>How payment works.</b> For now converting order marks it as paid. TCW will not fulfill the order until the invoice is settled. To be discussed soon, treat the current state as a placeholder.</div>
 
 <h3>Watch it ship</h3>
 <pre><code>{ order(id: "7087128739978") { name fulfillmentStatus tracking { number url company } } }</code></pre>
@@ -245,7 +252,7 @@ li{margin:.3rem 0}
 <h3>Limits</h3>
 <ul>
   <li>Per hold or order: at most <b>50 units</b> and <b>5,000 USD</b> at retail.</li>
-  <li>At most <b>10 open holds</b> at a time. Release or convert one to place another.</li>
+  <li>At most <b>50 open holds</b> at a time. Release or convert one to place another.</li>
   <li>Hold length 1 to <b>7 days</b> per request, <b>14 days</b> total after extensions.</li>
   <li>Writes are limited to <b>20 per minute</b> per key, separate from the read limit.</li>
 </ul>
@@ -267,7 +274,6 @@ li{margin:.3rem 0}
 </ul>
 
 <h2>Changes and support</h2>
-<p>The schema only grows. New fields and types are added without notice; existing fields are never removed or changed in meaning without contacting you first, and deprecated fields keep working for a transition period. Point your tooling at introspection to pick up additions.</p>
 <p>Questions, a lost key, or a higher rate limit: <b>richie@tradingcardworld.info</b>.</p>
 <p class="eyebrow" style="margin-top:2rem">Guide version 2026-09-18 (rev 3): holds and orders</p>
 </div>
