@@ -169,7 +169,7 @@ li{margin:.3rem 0}
 
 <h2 id="holds">Holds and orders</h2>
 <p>A <b>hold</b> reserves specific units for you for a set number of days. While it stands, those units are unavailable to every other channel, including TCW's own store and website. At the end you either <b>convert</b> it into an order that we ship to you, <b>release</b> it, or let it <b>expire</b>, at which point the units go back on sale. An <b>order</b> is the same thing without the waiting: reserve and convert in one call.</p>
-<p>These need the <code>holds:write</code> and <code>orders:write</code> scopes on your key; <code>orders:read</code> lets you read your own holds and orders back. You only ever see and control your own. Prices are TCW's retail prices at the moment the hold is placed.</p>
+<p>A line names its item by <code>sku</code> <em>or</em> by <code>variantId</code>, the <code>Variant.id</code> the catalog returns. Use <code>variantId</code> for the products that have no SKU; it is TCW's own id and never changes. These need the <code>holds:write</code> and <code>orders:write</code> scopes on your key; <code>orders:read</code> lets you read your own holds and orders back. You only ever see and control your own. Prices are TCW's retail prices at the moment the hold is placed.</p>
 
 <div class="tablewrap"><table>
 <tr><th>mutation</th><th>does</th></tr>
@@ -200,6 +200,17 @@ li{margin:.3rem 0}
 <pre><code>{"data":{"createHold":{"hold":{"id":"h_d79c13c62082","status":"HELD","units":1,"subtotal":"80.00",
   "currency":"USD","expiresAt":"2026-09-19T16:25:45Z","createdAt":"2026-09-18T16:25:45Z"},"problems":[]}}}</code></pre>
 <p>From this moment the variant's <code>stock.quantity</code> is one lower for everyone, including you.</p>
+
+<h3>A product with no SKU</h3>
+<p>Some products, mostly sports boxes and older sealed items, have no SKU. Their <code>Variant.sku</code> is empty, but every variant has an <code>id</code>. Pass that instead:</p>
+<pre><code>mutation {
+  createHold(input: { lines: [{ variantId: "44123456789012", quantity: 1 }, { sku: "PKMS-1465-N", quantity: 2 }],
+                      idempotencyKey: "PO-1043-hold", dryRun: true }) {
+    hold { lines { sku variantId title quantity unitPrice } subtotal }
+    problems { code message sku variantId }
+  }
+}</code></pre>
+<p>Both kinds of line can be mixed in one request. Every hold and order line comes back with both <code>sku</code> and <code>variantId</code>, so you can match on whichever you keep.</p>
 
 <h3>idempotencyKey: so a retry can never double an order</h3>
 <p>Networks fail at the worst moment. Your system sends "hold one bundle", we create the hold, and the reply is lost on the way back to you, or your client gives up waiting. From your side the request failed, so it retries. Without protection that retry creates a <em>second</em> hold, and on <code>createOrder</code> a second shipment.</p>
@@ -241,7 +252,7 @@ li{margin:.3rem 0}
 <p>Business rules come back in <code>problems</code> with a 200, not as GraphQL errors. The request was understood but not performed; nothing was written.</p>
 <div class="tablewrap"><table>
 <tr><th>code</th><th>meaning</th></tr>
-<tr><td><code>SKU_NOT_FOUND</code> / <code>NOT_AVAILABLE</code></td><td>No live product with that SKU, or it is not for sale.</td></tr>
+<tr><td><code>SKU_NOT_FOUND</code> / <code>NOT_AVAILABLE</code></td><td>No live product with that SKU or variantId (or a line gave neither, or both), or it is not for sale.</td></tr>
 <tr><td><code>INSUFFICIENT_STOCK</code></td><td>Fewer units available than requested; the message says how many.</td></tr>
 <tr><td><code>INVALID_QUANTITY</code> / <code>DUPLICATE_SKU</code> / <code>NO_LINES</code></td><td>Malformed lines.</td></tr>
 <tr><td><code>TOO_MANY_UNITS</code> / <code>VALUE_LIMIT</code> / <code>TOO_MANY_HOLDS</code> / <code>INVALID_DAYS</code></td><td>Over a limit, see below.</td></tr>
@@ -275,5 +286,5 @@ li{margin:.3rem 0}
 
 <h2>Changes and support</h2>
 <p>Questions, a lost key, or a higher rate limit: <b>richie@tradingcardworld.info</b>.</p>
-<p class="eyebrow" style="margin-top:2rem">Guide version 2026-09-18 (rev 3): holds and orders</p>
+<p class="eyebrow" style="margin-top:2rem">Guide version 2026-09-23 (rev 4): lines by variantId</p>
 </div>
