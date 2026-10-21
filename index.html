@@ -168,7 +168,7 @@ li{margin:.3rem 0}
 
 
 <h2 id="holds">Holds and orders</h2>
-<p>A <b>hold</b> reserves specific units for you for a set number of days. While it stands, those units are unavailable to every other channel, including TCW's own store and website. At the end you either <b>convert</b> it into an order that we ship to you, <b>release</b> it, or let it <b>expire</b>, at which point the units go back on sale. An <b>order</b> is the same thing without the waiting: reserve and convert in one call.</p>
+<p>A <b>hold</b> reserves specific units for you for a set number of days. While it stands, those units are unavailable to every other channel, including TCW's own store and website. At the end you either <b>convert</b> it, which asks us to ship it to you once you have paid for it, <b>release</b> it, or let it <b>expire</b>, at which point the units go back on sale. <code>createOrder</code> is the same thing without the waiting: reserve and request the shipment in one call.</p>
 <p>A line names its item by <code>sku</code> <em>or</em> by <code>variantId</code>, the <code>Variant.id</code> the catalog returns. Use <code>variantId</code> for the products that have no SKU; it is TCW's own id and never changes. These need the <code>holds:write</code> and <code>orders:write</code> scopes on your key; <code>orders:read</code> lets you read your own holds and orders back. You only ever see and control your own. Prices are TCW's retail prices at the moment the hold is placed.</p>
 
 <div class="tablewrap"><table>
@@ -176,8 +176,8 @@ li{margin:.3rem 0}
 <tr><td><code>createHold(input)</code></td><td>Reserve units for <code>holdDays</code> (default 3, max 7).</td></tr>
 <tr><td><code>extendHold(id, days)</code></td><td>Push the expiry out. A hold can last 14 days in total.</td></tr>
 <tr><td><code>releaseHold(id)</code></td><td>Give the units back. Safe to repeat.</td></tr>
-<tr><td><code>convertHold(id, input)</code></td><td>Turn the hold into an order shipped to your address.</td></tr>
-<tr><td><code>createOrder(input)</code></td><td>Order directly, no hold. Same rules and limits.</td></tr>
+<tr><td><code>convertHold(id, input)</code></td><td>Request that the hold ship to your address. It becomes an order once you have paid for it.</td></tr>
+<tr><td><code>createOrder(input)</code></td><td>Hold and request the shipment in one call. Same rules, limits and payment as <code>convertHold</code>.</td></tr>
 </table></div>
 <p>Queries: <code>hold(id)</code>, <code>holds(status, first)</code>, <code>order(id)</code>, <code>orders(first)</code>.</p>
 
@@ -222,21 +222,26 @@ li{margin:.3rem 0}
 </ul>
 <p>Keys are scoped to you, so they only need to be unique within your own system. The rule of thumb: generate the key <em>before</em> you send, store it with the request, and reuse it on every retry of that request. <code>convertHold</code>, <code>extendHold</code> and <code>releaseHold</code> don't need one because they act on a hold that already exists; repeating them is safe by nature.</p>
 
-<h3>Convert it to an order</h3>
+<h3>Request the shipment</h3>
+<p><code>convertHold</code> records that you want the hold shipped. It does not place the order yet: the hold moves to <code>REQUESTED</code> and its units stay reserved for you while payment is pending (<code>expiresAt</code> shows until when). We add a flat <b>$9.99 shipping</b> charge to each hold you convert, and tax on the items and shipping (none if your account is tax exempt); the hold's <code>shipping</code>, <code>tax</code> and <code>total</code> show the amounts. Each day we total your requests and invoice you for them. Once that invoice is paid, each hold moves to <code>PAID</code> and then, within a few minutes, to <code>CONVERTED</code> with its <code>order</code>.</p>
 <pre><code>mutation {
   convertHold(id: "h_d79c13c62082", input: {
     shippingAddress: { company: "Acme Cards", firstName: "Receiving", lastName: "Dept",
                        address1: "20 W 34th St", city: "New York", province: "NY", country: "US", zip: "10001" }
     reference: "PO-1042" }) {
-    order { id name createdAt paymentStatus fulfillmentStatus subtotal shipping tax total lines { sku quantity unitPrice } }
-    hold { status }
+    hold { status subtotal shipping tax total expiresAt }
+    order { name }
     problems { code message }
   }
 }</code></pre>
-<pre><code>{"data":{"convertHold":{"order":{"id":"7087128739978","name":"#88664","createdAt":"2026-09-18T16:28:40Z",
-  "paymentStatus":"PAID","fulfillmentStatus":"UNFULFILLED","subtotal":"80.00","shipping":"0.00","tax":"0.00","total":"80.00",
-  "lines":[{"sku":"PKMS-1465-N","quantity":1,"unitPrice":"80.00"}]},"hold":{"status":"CONVERTED"},"problems":[]}}}</code></pre>
-<div class="note"><b>How payment works.</b> For now converting order marks it as paid. TCW will not fulfill the order until the invoice is settled. To be discussed soon, treat the current state as a placeholder.</div>
+<pre><code>{"data":{"convertHold":{"hold":{"status":"REQUESTED","subtotal":"80.00","shipping":"9.99","tax":"7.99","total":"97.98",
+  "expiresAt":"2026-09-25T16:28:40Z"},
+  "order":null,"problems":[]}}}</code></pre>
+<p>Calling it again is safe and returns the hold as it stands. A requested hold can no longer be extended or released from the API; contact us if you need to cancel one. After payment, read the order from the hold:</p>
+<pre><code>{ hold(id: "h_d79c13c62082") { status order { id name paymentStatus fulfillmentStatus subtotal shipping tax total } } }</code></pre>
+<pre><code>{"data":{"hold":{"status":"CONVERTED","order":{"id":"7087128739978","name":"#88664","paymentStatus":"PAID",
+  "fulfillmentStatus":"UNFULFILLED","subtotal":"80.00","shipping":"9.99","tax":"7.99","total":"97.98"}}}}</code></pre>
+<div class="note"><b>How payment works.</b> Requests are totalled per calendar day (US Eastern time): items at hold prices, plus $9.99 shipping per hold, plus tax. An order is only created after that day's invoice is paid, so every order you see has been paid for. This applies to <code>createOrder</code> too: it returns the requested hold with its <code>total</code>, and <code>order</code> is null until payment.</div>
 
 <h3>Watch it ship</h3>
 <pre><code>{ order(id: "7087128739978") { name fulfillmentStatus tracking { number url company } } }</code></pre>
@@ -256,7 +261,7 @@ li{margin:.3rem 0}
 <tr><td><code>INSUFFICIENT_STOCK</code></td><td>Fewer units available than requested; the message says how many.</td></tr>
 <tr><td><code>INVALID_QUANTITY</code> / <code>DUPLICATE_SKU</code> / <code>NO_LINES</code></td><td>Malformed lines.</td></tr>
 <tr><td><code>TOO_MANY_UNITS</code> / <code>VALUE_LIMIT</code> / <code>TOO_MANY_HOLDS</code> / <code>INVALID_DAYS</code></td><td>Over a limit, see below.</td></tr>
-<tr><td><code>HOLD_NOT_HELD</code> / <code>HOLD_EXPIRED</code></td><td>The hold is not in a state that allows this; e.g. releasing a converted hold.</td></tr>
+<tr><td><code>HOLD_NOT_HELD</code> / <code>HOLD_EXPIRED</code></td><td>The hold is not in a state that allows this; e.g. releasing a hold after requesting its shipment.</td></tr>
 <tr><td><code>IDEMPOTENCY_MISMATCH</code></td><td>That key was already used for a different request.</td></tr>
 </table></div>
 
