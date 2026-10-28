@@ -47,7 +47,7 @@ li{margin:.3rem 0}
 <header class="top">
   <div class="eyebrow">Trading Card World · partner API</div>
   <h1>TCW Partner API Guide</h1>
-  <p class="lede">A GraphQL API over Trading Card World's live catalog: products, variants, prices, images, and stock, plus <b>holds</b> that reserve stock for you and <b>shipment requests</b> that become orders we ship once you have paid for them. This page is everything you need to integrate.</p>
+  <p class="lede">A GraphQL API over Trading Card World's live catalog: products, variants, prices, images, and stock, plus <b>holds</b> that reserve stock for you, <b>shipment requests</b> that become orders we ship once you have paid for them, and, for partners set up for it, <b>graded slabs</b> you can buy by cert and keep in TCW's vault. This page is everything you need to integrate.</p>
 </header>
 
 <h2>Connect</h2>
@@ -302,6 +302,36 @@ li{margin:.3rem 0}
 </ul>
 <p>Need more room on the unit or open-hold limits? Ask; they are settings on your key and we can raise them for you.</p>
 
+<h2 id="slabs">Graded slabs</h2>
+<p>If your key has the <code>slabs:read</code> and <code>slabs:write</code> scopes, you can browse and buy graded slabs from TCW's vault. Every slab is one of a kind, so it is named by its <b>cert number</b>. The list is live (at most 30 seconds old, see <code>generatedAt</code>), and a slab you or anyone else has requested drops off it.</p>
+<pre><code>{
+  slabs(first: 50, grader: "PSA", search: "charizard", maxPrice: 1500) {
+    totalCount generatedAt
+    pageInfo { hasNextPage endCursor }
+    edges { node { cert grader grade name year set number game language price frontImage backImage } }
+  }
+}</code></pre>
+<p>Filters <code>game</code>, <code>grader</code> and <code>grade</code> match exactly (any case); <code>search</code> matches the name, set, card number or cert; <code>minPrice</code> / <code>maxPrice</code> are in USD. Page with <code>after: endCursor</code>, up to 250 per page. <code>slab(cert)</code> reads one slab and returns null once it is no longer available.</p>
+
+<h3>Request slabs</h3>
+<p><code>requestSlabs</code> sets the certs you name aside for you straight away, at their current price, which is then locked on your request. If a price refreshed between your browse and your request, the locked price can differ a little from the list; the request shows the exact amount. Any cert that has gone in the meantime comes back in <code>unavailable</code> and in <code>problems</code> as <code>NOT_AVAILABLE</code>, and the rest are still requested. <code>dryRun: true</code> prices the certs from the list without setting anything aside, and <code>idempotencyKey</code> works exactly as it does for holds.</p>
+<pre><code>mutation {
+  requestSlabs(input: { certs: ["81234567", "81234568"], reference: "PO-2201", idempotencyKey: "PO-2201-slabs" }) {
+    request { id status units total lines { cert grader grade name price } unavailable { cert reason } }
+    problems { code message cert }
+  }
+}</code></pre>
+<p><b>Payment is direct, with no tax and no shipping.</b> Each day we total your slab requests and invoice you. When that invoice is paid, the request moves to <code>PAID</code> and then <code>OWNED</code>. Your slabs stay in TCW's vault after that; to have some shipped, email us.</p>
+<div class="tablewrap"><table>
+<tr><th>status</th><th>means</th></tr>
+<tr><td><code>REQUESTED</code></td><td>Set aside for you at the locked prices, waiting for payment.</td></tr>
+<tr><td><code>PAID</code></td><td>Payment received; being recorded. Usually minutes.</td></tr>
+<tr><td><code>OWNED</code></td><td>Yours. TCW keeps storing them.</td></tr>
+<tr><td><code>CANCELLED</code></td><td>Withdrawn by TCW before payment (for example at your request); the slabs went back on offer.</td></tr>
+<tr><td><code>REJECTED</code></td><td>None of the certs were available. Nothing to pay.</td></tr>
+</table></div>
+<p>Read them back with <code>slabRequest(id)</code> and <code>slabRequests(status, first)</code>. A request takes at most 50 certs (the same unit limit as holds; we can raise it), counts against the 20 writes per minute, and a cert may appear only once (<code>DUPLICATE_CERT</code>). If the slab vault is briefly unreachable, <code>requestSlabs</code> returns an <code>UNAVAILABLE</code> error: retry with the same <code>idempotencyKey</code>.</p>
+
 <h2>Limits and errors</h2>
 <div class="tablewrap"><table>
 <tr><th>status</th><th>meaning</th><th>what to do</th></tr>
@@ -318,6 +348,6 @@ li{margin:.3rem 0}
 </ul>
 
 <h2>Changes and support</h2>
-<p>Questions, a lost key, a higher limit, an invoice, or cancelling a shipment request: <b>integrations@tradingcardworld.info</b>.</p>
-<p class="eyebrow" style="margin-top:2rem">Guide version 2026-10-21 (rev 5): orders are paid first; shipment requests, $9.99 shipping plus tax, daily invoices</p>
+<p>Questions, a lost key, a higher limit, an invoice, cancelling a shipment or slab request, or shipping slabs you own: <b>integrations@tradingcardworld.info</b>.</p>
+<p class="eyebrow" style="margin-top:2rem">Guide version 2026-10-28 (rev 6): graded slabs (slabs, requestSlabs, slabRequests)</p>
 </div>
