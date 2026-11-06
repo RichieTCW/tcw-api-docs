@@ -179,6 +179,7 @@ li{margin:.3rem 0}
 <tr><td><code>PAID</code></td><td>Payment received; the order is being created.</td><td>Automatic, within about 15 minutes.</td></tr>
 <tr><td><code>CONVERTED</code></td><td>An order exists. Read it from the hold's <code>order</code>.</td><td>We ship it; follow <code>order.fulfillmentStatus</code>.</td></tr>
 <tr><td><code>RELEASED</code> / <code>EXPIRED</code></td><td>Units back on sale.</td><td>Final.</td></tr>
+<tr><td><code>CANCELLED</code></td><td>We cancelled the shipment request before payment, for example at your request. Nothing is owed and the units go back on sale. <code>cancelledAt</code> and <code>cancelReason</code> say when and why.</td><td>Final.</td></tr>
 </table></div>
 <p>A line names its item by <code>sku</code> <em>or</em> by <code>variantId</code>, the <code>Variant.id</code> the catalog returns. Use <code>variantId</code> for the products that have no SKU; it is TCW's own id and never changes. These need the <code>holds:write</code> and <code>orders:write</code> scopes on your key; <code>orders:read</code> lets you read your own holds and orders back. You only ever see and control your own. Prices are TCW's retail prices at the moment the hold is placed.</p>
 
@@ -249,7 +250,7 @@ li{margin:.3rem 0}
 <pre><code>{"data":{"convertHold":{"hold":{"status":"REQUESTED","subtotal":"80.00","shipping":"9.99","tax":"7.99","total":"97.98",
   "expiresAt":"2026-09-25T16:28:40Z"},
   "order":null,"problems":[]}}}</code></pre>
-<p>Calling it again is safe and returns the hold as it stands. A requested hold can no longer be extended or released from the API; contact us if you need to cancel one. Pay before <code>expiresAt</code>: after that the reservation lapses and the units can sell elsewhere. After payment, read the order from the hold:</p>
+<p>Calling it again is safe and returns the hold as it stands. A requested hold can no longer be extended or released from the API; contact us if you need to cancel one. Once we have, the hold reads <code>CANCELLED</code>, with <code>cancelledAt</code> and <code>cancelReason</code> set and <code>order</code> null. A request can be cancelled only before it is paid. Pay before <code>expiresAt</code>: after that the reservation lapses and the units can sell elsewhere. After payment, read the order from the hold:</p>
 <pre><code>{ hold(id: "h_d79c13c62082") { status order { id name paymentStatus fulfillmentStatus subtotal shipping tax total } } }</code></pre>
 <pre><code>{"data":{"hold":{"status":"CONVERTED","order":{"id":"7087128739978","name":"#88664","paymentStatus":"PAID",
   "fulfillmentStatus":"UNFULFILLED","subtotal":"80.00","shipping":"9.99","tax":"7.99","total":"97.98"}}}}</code></pre>
