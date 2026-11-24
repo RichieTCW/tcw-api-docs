@@ -54,7 +54,7 @@ li{margin:.3rem 0}
 <dl class="kv">
   <dt>endpoint</dt><dd><code>POST https://tcw-api-8rgfmmib.uc.gateway.dev/graphql</code></dd>
   <dt>auth</dt><dd>Header <code>x-api-key: &lt;your key&gt;</code> on every request. Your key was issued to you once; TCW does not store it and cannot recover it. If it's lost, ask for a new one.</dd>
-  <dt>key type</dt><dd>Every key is one of two types. A <b>vaulting</b> key can place holds, request their shipment, order in one call, and buy graded slabs that stay in TCW's vault. A <b>direct-order</b> key orders with <code>createOrder</code> only: no holds and no slabs. Keys issued before November 2026 are vaulting keys. Ask us if you need the other type.</dd>
+  <dt>key type</dt><dd>Every key is one of two types. A <b>vaulting</b> key can place holds, request their shipment, order in one call, and buy graded slabs that stay in TCW's vault. A <b>direct-order</b> key can read everything, including the slab list, but its only order call is <code>createOrder</code>: no holds and no slab requests. Keys issued before November 2026 are vaulting keys. Ask us if you need the other type.</dd>
   <dt>body</dt><dd>JSON <code>{"query": "...", "variables": {...}}</code>, standard GraphQL over HTTP. GET with a <code>query</code> parameter also works for simple reads.</dd>
   <dt>liveness</dt><dd><code>GET https://tcw-api-8rgfmmib.uc.gateway.dev/status</code>, no key needed, returns <code>{"ok":true,"version":"..."}</code></dd>
   <dt>schema</dt><dd>Introspection is enabled. Point any GraphQL client at the endpoint with your key and it will autocomplete.</dd>
@@ -320,7 +320,7 @@ mutation {
 <p>Need more room on the unit or open-hold limits? Ask; they are settings on your key and we can raise them for you.</p>
 
 <h2 id="slabs">Graded slabs</h2>
-<p>If your key is a vaulting key with the <code>slabs:read</code> and <code>slabs:write</code> scopes, you can browse and buy graded slabs from TCW's vault. Every slab is one of a kind, so it is named by its <b>cert number</b>. The list is live (at most 30 seconds old, see <code>generatedAt</code>), and a slab you or anyone else has requested drops off it.</p>
+<p>Graded slabs are single cards in TCW's vault. Any key with the <code>slabs:read</code> scope can browse them; buying them takes <code>slabs:write</code> on a vaulting key. Every slab is one of a kind, so it is named by its <b>cert number</b>. The list is live (at most 30 seconds old, see <code>generatedAt</code>), and a slab you or anyone else has requested drops off it.</p>
 <pre><code>{
   slabs(first: 50, grader: "PSA", search: "charizard", maxPrice: 1500) {
     totalCount generatedAt
@@ -361,10 +361,10 @@ mutation {
   <li><b>Rate limit</b> is per key: 300 requests per minute unless you were told otherwise. Every request counts, including errors. Paging at a few requests per second is fine.</li>
   <li><b>Query limits:</b> depth 7, at most 10 aliases, and a cost budget sized so a full <code>first: 250</code> page with every product and variant field fits. Larger pages are refused; page instead.</li>
   <li><b>No batching</b> of multiple operations in one request.</li>
-  <li><b>Scope errors</b> come back as a GraphQL error with <code>extensions.code: "FORBIDDEN"</code> naming the scope your key lacks. A vaulting-only call (holds, <code>convertHold</code>, slabs) made with a direct-order key fails the same way, naming <code>vaulting</code>.</li>
+  <li><b>Scope errors</b> come back as a GraphQL error with <code>extensions.code: "FORBIDDEN"</code> naming the scope your key lacks. A vaulting-only call (holds, <code>convertHold</code>, <code>requestSlabs</code>) made with a direct-order key fails the same way, naming <code>vaulting</code>.</li>
 </ul>
 
 <h2>Changes and support</h2>
 <p>Questions, a lost key, a higher limit, an invoice, cancelling a shipment or slab request, or shipping slabs you own: <b>integrations@tradingcardworld.info</b>.</p>
-<p class="eyebrow" style="margin-top:2rem">Guide version 2026-11-24 (rev 7): key types (vaulting, direct order)</p>
+<p class="eyebrow" style="margin-top:2rem">Guide version 2026-11-24 (rev 8): direct-order keys can read the slab list</p>
 </div>
